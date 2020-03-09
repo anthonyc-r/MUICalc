@@ -1,0 +1,4 @@
+*.d
+*.o
+TestAmbient_DEBUG
+TestAmbient_RELEASE

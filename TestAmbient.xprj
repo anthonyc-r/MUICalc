@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="ISO-8859-1" standalone="yes"?>
+<FlowStudioProjectFile>
+    <FileVersion major="0" minor="1"/>
+    <Project>
+        <Option projectname="TestAmbient"/>
+        <Option autosave="1"/>
+        <Option buildcommand="gg:bin/make -f"/>
+        <Option makefile="Makefile"/>
+        <Option manualmakefile="0"/>
+        <Option quietoutput="1"/>
+        <Option cvscommand="gg:bin/cvs"/>
+        <Option defaulttarget="DEBUG"/>
+        <Option activetarget="DEBUG"/>
+        <Option crossbuild="0"/>
+        <Option crossserver=""/>
+        <Option crosslogin=""/>
+        <Option crossdir=""/>
+        <Target name="DEBUG">
+            <Option type="2"/>
+            <Option execfile="TestAmbient_DEBUG"/>
+            <Option execdir=""/>
+            <Option objectsdir=""/>
+            <Option arguments=""/>
+            <Option depsfile=""/>
+            <Option autodeps="1"/>
+            <Option customcompiler="0"/>
+            <Option customlinker="0"/>
+        </Target>
+        <LinkerSettings>
+            <Option linkerpath="ppc-morphos-gcc-4"/>
+            <Option linkerflags=""/>
+            <Option linkerlibraries=""/>
+        </LinkerSettings>
+        <CompilerSettings>
+            <Option cc_predefined="2"/>
+            <Option cc="ppc-morphos-gcc-4"/>
+            <Option cflags="-noixemul -Wall -Wextra"/>
+            <Option cincludes=""/>
+            <Option cdefines=""/>
+            <Option cxx_predefined="2"/>
+            <Option cxx="ppc-morphos-g++-4"/>
+            <Option cppflags="-noixemul"/>
+            <Option cppincludes=""/>
+            <Option cppdefines=""/>
+            <Option objcc_predefined="8"/>
+            <Option objcc="ppc-morphos-clang"/>
+            <Option objcflags="-fobjc-runtime=objfw -fconstant-string-class=OBConstantString"/>
+            <Option objcincludes="-I/SDK/Frameworks/include"/>
+            <Option objcdefines=""/>
+        </CompilerSettings>
+        <FileUnit filepath="main.c">
+            <Option inproject="1"/>
+            <Option filetype="1"/>
+        </FileUnit>
+    </Project>
+</FlowStudioProjectFile>
