@@ -28,13 +28,13 @@
         </Target>
         <LinkerSettings>
             <Option linkerpath="ppc-morphos-gcc-4"/>
-            <Option linkerflags=""/>
+            <Option linkerflags="-noixemul"/>
             <Option linkerlibraries=""/>
         </LinkerSettings>
         <CompilerSettings>
             <Option cc_predefined="2"/>
             <Option cc="ppc-morphos-gcc-4"/>
-            <Option cflags="-noixemul -Wall -Wextra"/>
+            <Option cflags="-noixemul  -Wall -Wextra"/>
             <Option cincludes=""/>
             <Option cdefines=""/>
             <Option cxx_predefined="2"/>

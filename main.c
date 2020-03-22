@@ -1,10 +1,15 @@
-/* compile with "gcc -noixemul -o helloworld_mui helloworld_mui.c" */
-
 #include <proto/muimaster.h>
 #include <proto/intuition.h>
 #include <proto/dos.h>
 #include <proto/alib.h>
 #include <proto/exec.h>
+#include <proto/mathtrans.h>
+#include <exec/rawfmt.h>
+#include <proto/mathffp.h>
+
+#include <clib/alib_protos.h>
+#include <clib/mathffp_protos.h>
+#include <clib/mathtrans_protos.h>
 
 #define CALM_Button_Pressed 0xAEAEAE01
 #define CALM_Show 			0xAEAEAE02
@@ -14,12 +19,15 @@
 		CALM_Button_Pressed, (ULONG)name);
 		
 #pragma pack()
-struct button_args {
+struct button_args 
+{
 	ULONG MethodID;
 	ULONG Button;
 };		
 
-enum calc_button {
+enum calc_button 
+{
+	CALC_BUTTON_NONE = -1,
 	CALC_BUTTON_ZERO = 0,
 	CALC_BUTTON_ONE,
 	CALC_BUTTON_TWO,
@@ -31,17 +39,29 @@ enum calc_button {
 	CALC_BUTTON_DOT
 };
 
-Object *App, *Win;
+enum calc_error 
+{
+	CALC_ERROR_NOLIBTRANS = -999
+};
 
+Object *App, *Win;
 
 struct MUI_CustomClass *CALC_Application = NULL;
 IPTR ApplicationDispatcher(void);
 const struct EmulLibEntry ApplicationGate = {TRAP_LIB, 0, (void(*)(void))ApplicationDispatcher};
 
+#define PLACES 12
 struct ApplicationData
 {
-	Object *Win, *One, *Two, *Three, *Four, *Multiply, *Divide, *Dot, *Equals, *Zero;
+	Object *Win, *Text, *One, *Two, *Three, *Four, *Multiply, *Divide, *Dot, *Equals, *Zero;
+	char display_value[PLACES];
+	int active_place;
+	long working_value;
+	BOOL initial_operation;
+	enum calc_button active_operation, new_operation;
 };
+
+void ApplicationResetDisplayValue(struct ApplicationData *app_data);
 
 struct MUI_CustomClass *CreateApplicationClass(void)
 {
@@ -70,9 +90,9 @@ Object *ApplicationWindow(struct ApplicationData *app_data)
 			MUIA_Window_CloseGadget, TRUE,
 			MUIA_Window_RootObject, MUI_NewObject(MUIC_Group,
 				MUIA_Group_Horiz, FALSE,
-				MUIA_Group_Child, MUI_NewObject(MUIC_Text,
+				MUIA_Group_Child, (app_data->Text = MUI_NewObject(MUIC_Text,
 					MUIA_Text_Contents, "0.0",
-				TAG_END),
+				TAG_END)),
 				MUIA_Group_Child, MUI_NewObject(MUIC_Group,
 					MUIA_Group_Horiz, TRUE,
 					MUIA_Group_Child, (app_data->One = MUI_MakeObject(MUIO_Button,
@@ -128,6 +148,12 @@ IPTR ApplicationNew(Class *cl, Object *obj, struct opSet *msg)
 	obj = (Object*)DoSuperMethodA(cl, obj, (Msg)msg);
 	struct ApplicationData *app_data = INST_DATA(cl, obj);
 	CopyMem(&preapp_data, app_data, sizeof preapp_data);
+	app_data->working_value = 0;
+	ApplicationResetDisplayValue(app_data);
+	app_data->active_place = 0;
+	app_data->initial_operation = TRUE;
+	app_data->active_operation = CALC_BUTTON_NONE;
+	app_data->new_operation = CALC_BUTTON_NONE;
 	DoMethod(app_data->Win, MUIM_Notify, MUIA_Window_CloseRequest, TRUE, obj, 2,
 		MUIM_Application_ReturnID, MUIV_Application_ReturnID_Quit);
 	CONNECT_BUTTON(app_data->One, CALC_BUTTON_ONE);
@@ -144,32 +170,179 @@ IPTR ApplicationNew(Class *cl, Object *obj, struct opSet *msg)
 }
 
 
+
+int slow_pow(int base, int pow) 
+{
+	int i = 0;
+	int result = 1;
+	for (; i < pow; i++)
+	{
+		result *= base;
+	}
+	return result;
+}
+
+int string_to_int(char *string)
+{
+	int result = 0;
+	int i = 0;
+	int len = 0;
+	
+	while(string[len] != '\0')
+	{
+		len++;
+	}
+	Printf("len of '%s' %ld\n", string, len);
+	for(i = 0; i < len; i++)
+	{
+		Printf("Adding %ld * %ld\n", slow_pow(10, i), (int)(string[len - i - 1] - 48)); 
+		result += slow_pow(10, i) * (int)(string[len - i - 1] - 48);
+	}
+
+	return result;
+}
+
+
+void ApplicationApplyOperation(struct ApplicationData *app_data)
+{
+	int result = 0;
+	int working = app_data->working_value;
+	int display = string_to_int(app_data->display_value);
+	Printf("Working value is %ld, display value is %ld\n", working, display);
+	switch (app_data->active_operation)
+	{
+		case CALC_BUTTON_MUL:
+			Printf("Op is MUL\n");
+			result = working * display;
+			break;
+		case CALC_BUTTON_DIV:
+			Printf("Op is DIV\n");
+			result = working / display;
+			break;
+		default:
+			break;
+	}
+	Printf("Result is %ld\n", result);
+	app_data->working_value = result;
+}
+
+
+void ApplicationAddToDisplayValue(struct ApplicationData *app_data, char value)
+{
+	Printf("Adding %ld to display\n", value);
+	if (app_data->active_place > PLACES - 1) 
+	{
+		app_data->active_place = PLACES - 1;
+	}
+	app_data->display_value[(app_data->active_place)++] = value + 48;
+	app_data->display_value[PLACES - 1] = '\0';
+}
+
+
+
+void ApplicationSetDisplayValueFromWorking(struct ApplicationData *app_data)
+{
+	char text[PLACES];
+	int i;
+	
+	NewRawDoFmt("%ld", RAWFMTFUNC_STRING, text, app_data->working_value);
+	for (i = 0; i < PLACES; i++)
+	{
+		app_data->display_value[i] = text[i];
+	}
+}
+
+void ApplicationSetWorkingValueFromDisplay(struct ApplicationData *app_data)
+{
+	int value = string_to_int(app_data->display_value);
+	app_data->working_value = value;
+	Printf("Set working value to %ld, from display %s\n", value, app_data->display_value);	
+}
+
+void ApplicationResetDisplayValue(struct ApplicationData *app_data)
+{
+	int i;
+	for (i = 0; i < PLACES; i++)
+	{
+		app_data->display_value[i] = '\0';
+	}
+	app_data->active_place = 0;
+}
+
+BOOL ApplicationDisplayValueContainsDot(struct ApplicationData *app_data) 
+{
+	int i;
+	for (i = 0; i < PLACES; i++)
+	{
+		if (app_data->display_value[i] == '.')
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 IPTR ApplicationButtonPressed(Class *cl, Object *obj, struct button_args *msg)
 {
-	Printf("Button Pressed!\n");
+	Printf("Button Pressed %ld!\n", msg->Button);
+	struct ApplicationData *app_data = INST_DATA(cl, obj);
+	
 	if (msg->Button < 5)
 	{
-		Printf("Pressed number: %ld\n", msg->Button);
+		if (app_data->new_operation == CALC_BUTTON_EQ)
+		{
+			ApplicationResetDisplayValue(app_data);
+			ApplicationAddToDisplayValue(app_data, msg->Button);
+		}
+		else if (app_data->new_operation == CALC_BUTTON_DOT && !ApplicationDisplayValueContainsDot(app_data))
+		{
+			ApplicationAddToDisplayValue(app_data, '.' - 48);
+		} 
+		else if (app_data->new_operation != CALC_BUTTON_NONE)
+		{
+			if (!app_data->initial_operation) 
+			{
+				ApplicationApplyOperation(app_data);
+			}
+			else
+			{
+				app_data->initial_operation = FALSE;
+				ApplicationSetWorkingValueFromDisplay(app_data);
+			}
+			ApplicationResetDisplayValue(app_data);
+			ApplicationAddToDisplayValue(app_data, msg->Button);
+			app_data->active_operation = app_data->new_operation;
+			app_data->new_operation = CALC_BUTTON_NONE;
+		}
+		else 
+		{
+			ApplicationAddToDisplayValue(app_data, msg->Button);
+		}
 	}
 	else
 	{
 		switch(msg->Button)
 		{
-			case CALC_BUTTON_MUL:
-				Printf("Mul\n");
-				break;
-			case CALC_BUTTON_DIV:
-				Printf("Div\n");
-				break;
-			case CALC_BUTTON_EQ:
-				Printf("Eq\n");
-			case CALC_BUTTON_DOT:
-				Printf("Dot\n");
-			default:
-				Printf("Not implemented\n");
+		case CALC_BUTTON_MUL:
+		case CALC_BUTTON_DIV:
+		case CALC_BUTTON_DOT:
+			app_data->new_operation = msg->Button;
+			break;
+		case CALC_BUTTON_EQ:
+			ApplicationApplyOperation(app_data);
+			ApplicationSetDisplayValueFromWorking(app_data);
+			app_data->working_value = 0;
+			app_data->initial_operation = TRUE;
+			app_data->active_operation = CALC_BUTTON_NONE;
+			app_data->new_operation = CALC_BUTTON_EQ;
+			break;
+		default:
+			break;
 		}
 	}
-
+	// Display changes in UI
+	set(app_data->Text, MUIA_Text_Contents, app_data->display_value);
+	Printf("working %ld, display '%s', active op %ld, new op %ld\n", app_data->working_value, app_data->display_value, app_data->active_operation, app_data->new_operation);
 	return 0;
 }
 
@@ -182,18 +355,18 @@ IPTR ApplicationDispatcher(void)
 	
 	switch (msg->MethodID)
 	{
-		case OM_NEW:	
-			return ApplicationNew(cl, obj, (struct opSet*)msg);
-		case CALM_Show: 
-			Printf("Show!\n");
-			return set(app_data->Win, MUIA_Window_Open, TRUE);
-		case CALM_Hide:
-			Printf("Hide!\n");
-			return set(app_data->Win, MUIA_Window_Open, FALSE);
-		case CALM_Button_Pressed:
-			return ApplicationButtonPressed(cl, obj, (struct button_args*)msg);
-		default:		
-			return DoSuperMethodA(cl, obj, msg);
+	case OM_NEW:	
+		return ApplicationNew(cl, obj, (struct opSet*)msg);
+	case CALM_Show: 
+		Printf("Show!\n");
+		return set(app_data->Win, MUIA_Window_Open, TRUE);
+	case CALM_Hide:
+		Printf("Hide!\n");
+		return set(app_data->Win, MUIA_Window_Open, FALSE);
+	case CALM_Button_Pressed:
+		return ApplicationButtonPressed(cl, obj, (struct button_args*)msg);
+	default:		
+		return DoSuperMethodA(cl, obj, msg);
 	}
 }
 

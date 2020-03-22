@@ -5,7 +5,7 @@
 
 
 CC = ppc-morphos-gcc-4
-CFLAGS = -noixemul -Wall -Wextra
+CFLAGS = -noixemul  -Wall -Wextra
 CXX = ppc-morphos-g++-4
 CPPFLAGS = -noixemul
 OBJCC = ppc-morphos-clang
@@ -21,6 +21,7 @@ export TERM = xterm
 endif
 
 LD=ppc-morphos-gcc-4
+LDFLAGS = -noixemul
 
 AR=ppc-morphos-ar
 RANLIB=ppc-morphos-ranlib
