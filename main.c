@@ -33,9 +33,16 @@ enum calc_button
 	CALC_BUTTON_TWO,
 	CALC_BUTTON_THREE,
 	CALC_BUTTON_FOUR,
+	CALC_BUTTON_FIVE,
+	CALC_BUTTON_SIX,
+	CALC_BUTTON_SEVEN,
+	CALC_BUTTON_EIGHT,
+	CALC_BUTTON_NINE,
 	CALC_BUTTON_EQ,
 	CALC_BUTTON_DIV,
 	CALC_BUTTON_MUL,
+	CALC_BUTTON_ADD,
+	CALC_BUTTON_SUB,
 	CALC_BUTTON_DOT
 };
 
@@ -53,7 +60,7 @@ const struct EmulLibEntry ApplicationGate = {TRAP_LIB, 0, (void(*)(void))Applica
 #define PLACES 12
 struct ApplicationData
 {
-	Object *Win, *Text, *One, *Two, *Three, *Four, *Multiply, *Divide, *Dot, *Equals, *Zero;
+	Object *Win, *Text, *One, *Two, *Three, *Four, *Five, *Six, *Seven, *Eight, *Nine, *Multiply, *Divide, *Dot, *Subtract, *Add, *Equals, *Zero;
 	char display_value[PLACES];
 	int active_place;
 	long working_value;
@@ -101,17 +108,23 @@ Object *ApplicationWindow(struct ApplicationData *app_data)
 					MUIA_Group_Child, (app_data->Two = MUI_MakeObject(MUIO_Button,
 						"2",
 					TAG_END)),
+					MUIA_Group_Child, (app_data->Three = MUI_MakeObject(MUIO_Button,
+						"3",
+					TAG_END)),
 					MUIA_Group_Child, (app_data->Multiply = MUI_MakeObject(MUIO_Button,
 						"*",
 					TAG_END)),
 				TAG_END),
 				MUIA_Group_Child, MUI_NewObject(MUIC_Group,
 					MUIA_Group_Horiz, TRUE,
-					MUIA_Group_Child, (app_data->Three = MUI_MakeObject(MUIO_Button,
-						"3",				
-					TAG_END)),
 					MUIA_Group_Child, (app_data->Four = MUI_MakeObject(MUIO_Button,
-						"4",
+						"4",				
+					TAG_END)),
+					MUIA_Group_Child, (app_data->Five = MUI_MakeObject(MUIO_Button,
+						"5",
+					TAG_END)),
+					MUIA_Group_Child, (app_data->Six = MUI_MakeObject(MUIO_Button,
+						"6",
 					TAG_END)),
 					MUIA_Group_Child, (app_data->Divide = MUI_MakeObject(MUIO_Button,
 						"/",
@@ -119,14 +132,32 @@ Object *ApplicationWindow(struct ApplicationData *app_data)
 				TAG_END),
 				MUIA_Group_Child, MUI_NewObject(MUIC_Group,
 					MUIA_Group_Horiz, TRUE,
-					MUIA_Group_Child, (app_data->Zero = MUI_MakeObject(MUIO_Button,
-						"0",				
+					MUIA_Group_Child, (app_data->Seven = MUI_MakeObject(MUIO_Button,
+						"7",				
 					TAG_END)),
+					MUIA_Group_Child, (app_data->Eight = MUI_MakeObject(MUIO_Button,
+						"8",
+					TAG_END)),
+					MUIA_Group_Child, (app_data->Nine = MUI_MakeObject(MUIO_Button,
+						"9",
+					TAG_END)),
+					MUIA_Group_Child, (app_data->Subtract = MUI_MakeObject(MUIO_Button,
+						"-",
+					TAG_END)),
+				TAG_END),
+				MUIA_Group_Child, MUI_NewObject(MUIC_Group,
+					MUIA_Group_Horiz, TRUE,
 					MUIA_Group_Child, (app_data->Dot = MUI_MakeObject(MUIO_Button,
-						".",
+						".",				
+					TAG_END)),
+					MUIA_Group_Child, (app_data->Zero = MUI_MakeObject(MUIO_Button,
+						"0",
 					TAG_END)),
 					MUIA_Group_Child, (app_data->Equals = MUI_MakeObject(MUIO_Button,
 						"=",
+					TAG_END)),
+					MUIA_Group_Child, (app_data->Add = MUI_MakeObject(MUIO_Button,
+						"+",
 					TAG_END)),
 				TAG_END),
 			TAG_END),
@@ -160,6 +191,13 @@ IPTR ApplicationNew(Class *cl, Object *obj, struct opSet *msg)
 	CONNECT_BUTTON(app_data->Two, CALC_BUTTON_TWO);
 	CONNECT_BUTTON(app_data->Three, CALC_BUTTON_THREE);
 	CONNECT_BUTTON(app_data->Four, CALC_BUTTON_FOUR);
+	CONNECT_BUTTON(app_data->Five, CALC_BUTTON_FIVE);
+	CONNECT_BUTTON(app_data->Six, CALC_BUTTON_SIX);
+	CONNECT_BUTTON(app_data->Seven, CALC_BUTTON_SEVEN);
+	CONNECT_BUTTON(app_data->Eight, CALC_BUTTON_EIGHT);
+	CONNECT_BUTTON(app_data->Nine, CALC_BUTTON_NINE);
+	CONNECT_BUTTON(app_data->Add, CALC_BUTTON_ADD);
+	CONNECT_BUTTON(app_data->Subtract, CALC_BUTTON_SUB);
 	CONNECT_BUTTON(app_data->Multiply, CALC_BUTTON_MUL);
 	CONNECT_BUTTON(app_data->Divide, CALC_BUTTON_DIV);
 	CONNECT_BUTTON(app_data->Dot, CALC_BUTTON_DOT);
@@ -203,7 +241,7 @@ int string_to_int(char *string)
 }
 
 
-void ApplicationApplyOperation(struct ApplicationData *app_data)
+BOOL ApplicationApplyOperation(struct ApplicationData *app_data)
 {
 	int result = 0;
 	int working = app_data->working_value;
@@ -217,13 +255,25 @@ void ApplicationApplyOperation(struct ApplicationData *app_data)
 			break;
 		case CALC_BUTTON_DIV:
 			Printf("Op is DIV\n");
-			result = working / display;
+			if (display == 0) 
+				return FALSE;
+			else
+				result = working / display;
+			break;
+		case CALC_BUTTON_ADD:
+			Printf("Op is ADD\n");
+			result = working + display;
+			break;
+		case CALC_BUTTON_SUB:
+			Printf("Op is sub\n");
+			result = working - display;
 			break;
 		default:
 			break;
 	}
 	Printf("Result is %ld\n", result);
 	app_data->working_value = result;
+	return TRUE;
 }
 
 
@@ -282,12 +332,21 @@ BOOL ApplicationDisplayValueContainsDot(struct ApplicationData *app_data)
 	return FALSE;
 }
 
+void ApplicationResetToError(struct ApplicationData *app_data)
+{
+	app_data->display_value[0] = 'E';
+	app_data->display_value[1] = 'R';
+	app_data->display_value[2] = 'R';
+	app_data->display_value[3] = '\0';
+	set(app_data->Text, MUIA_Text_Contents, app_data->display_value);	
+}
+
 IPTR ApplicationButtonPressed(Class *cl, Object *obj, struct button_args *msg)
 {
 	Printf("Button Pressed %ld!\n", msg->Button);
 	struct ApplicationData *app_data = INST_DATA(cl, obj);
 	
-	if (msg->Button < 5)
+	if (msg->Button < 10)
 	{
 		if (app_data->new_operation == CALC_BUTTON_EQ)
 		{
@@ -302,7 +361,11 @@ IPTR ApplicationButtonPressed(Class *cl, Object *obj, struct button_args *msg)
 		{
 			if (!app_data->initial_operation) 
 			{
-				ApplicationApplyOperation(app_data);
+				if (!ApplicationApplyOperation(app_data))
+				{
+					ApplicationResetToError(app_data);
+					return 0;
+				}
 			}
 			else
 			{
@@ -326,10 +389,16 @@ IPTR ApplicationButtonPressed(Class *cl, Object *obj, struct button_args *msg)
 		case CALC_BUTTON_MUL:
 		case CALC_BUTTON_DIV:
 		case CALC_BUTTON_DOT:
+		case CALC_BUTTON_ADD:
+		case CALC_BUTTON_SUB:
 			app_data->new_operation = msg->Button;
 			break;
 		case CALC_BUTTON_EQ:
-			ApplicationApplyOperation(app_data);
+			if (!ApplicationApplyOperation(app_data))
+			{
+				ApplicationResetToError(app_data);
+				return 0;
+			}
 			ApplicationSetDisplayValueFromWorking(app_data);
 			app_data->working_value = 0;
 			app_data->initial_operation = TRUE;
