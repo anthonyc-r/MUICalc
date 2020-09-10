@@ -38,12 +38,12 @@ enum calc_button
 	CALC_BUTTON_SEVEN,
 	CALC_BUTTON_EIGHT,
 	CALC_BUTTON_NINE,
+	CALC_BUTTON_DOT,
 	CALC_BUTTON_EQ,
 	CALC_BUTTON_DIV,
 	CALC_BUTTON_MUL,
 	CALC_BUTTON_ADD,
-	CALC_BUTTON_SUB,
-	CALC_BUTTON_DOT
+	CALC_BUTTON_SUB
 };
 
 enum calc_error 
@@ -63,7 +63,7 @@ struct ApplicationData
 	Object *Win, *Text, *One, *Two, *Three, *Four, *Five, *Six, *Seven, *Eight, *Nine, *Multiply, *Divide, *Dot, *Subtract, *Add, *Equals, *Zero;
 	char display_value[PLACES];
 	int active_place;
-	long working_value;
+	double working_value;
 	BOOL initial_operation;
 	enum calc_button active_operation, new_operation;
 };
@@ -179,7 +179,7 @@ IPTR ApplicationNew(Class *cl, Object *obj, struct opSet *msg)
 	obj = (Object*)DoSuperMethodA(cl, obj, (Msg)msg);
 	struct ApplicationData *app_data = INST_DATA(cl, obj);
 	CopyMem(&preapp_data, app_data, sizeof preapp_data);
-	app_data->working_value = 0;
+	app_data->working_value = 0.0;
 	ApplicationResetDisplayValue(app_data);
 	app_data->active_place = 0;
 	app_data->initial_operation = TRUE;
@@ -220,22 +220,32 @@ int slow_pow(int base, int pow)
 	return result;
 }
 
-int string_to_int(char *string)
+double string_to_double(char *string)
 {
-	int result = 0;
+	double result = 0;
 	int i = 0;
+	int j = 0;
 	int len = 0;
+	int dot_loc;
 	
 	while(string[len] != '\0')
 	{
 		len++;
 	}
+	dot_loc = len;
 	Printf("len of '%s' %ld\n", string, len);
 	for(i = 0; i < len; i++)
 	{
-		Printf("Adding %ld * %ld\n", slow_pow(10, i), (int)(string[len - i - 1] - 48)); 
-		result += slow_pow(10, i) * (int)(string[len - i - 1] - 48);
+		if (string[i] == '.') 
+		{
+			dot_loc = i + 1;
+			continue;
+		}
+		Printf("Adding %ld * %ld\n", slow_pow(10, j), (int)(string[len - i - 1] - 48)); 
+		result += slow_pow(10, j) * (int)(string[len - i - 1] - 48);
+		j++;
 	}
+	result /= slow_pow(10, len - dot_loc);
 
 	return result;
 }
@@ -243,10 +253,10 @@ int string_to_int(char *string)
 
 BOOL ApplicationApplyOperation(struct ApplicationData *app_data)
 {
-	int result = 0;
-	int working = app_data->working_value;
-	int display = string_to_int(app_data->display_value);
-	Printf("Working value is %ld, display value is %ld\n", working, display);
+	double result = 0;
+	double working = app_data->working_value;
+	double display = string_to_double(app_data->display_value);
+	Printf("Working value is %ld, display value is %ld\n", (long)working, (long)display);
 	switch (app_data->active_operation)
 	{
 		case CALC_BUTTON_MUL:
@@ -271,7 +281,7 @@ BOOL ApplicationApplyOperation(struct ApplicationData *app_data)
 		default:
 			break;
 	}
-	Printf("Result is %ld\n", result);
+	Printf("Result is %ld\n", (long)result);
 	app_data->working_value = result;
 	return TRUE;
 }
@@ -288,6 +298,16 @@ void ApplicationAddToDisplayValue(struct ApplicationData *app_data, char value)
 	app_data->display_value[PLACES - 1] = '\0';
 }
 
+void ApplicationAddDotToDisplayValue(struct ApplicationData *app_data)
+{
+	Printf("Adding dot to display\n");
+	if (app_data->active_place > PLACES - 1)
+	{
+		app_data->active_place = PLACES - 1;
+	}
+	app_data->display_value[(app_data->active_place)++] = '.';
+	app_data->display_value[PLACES - 1] = '\0';
+}
 
 
 void ApplicationSetDisplayValueFromWorking(struct ApplicationData *app_data)
@@ -295,7 +315,7 @@ void ApplicationSetDisplayValueFromWorking(struct ApplicationData *app_data)
 	char text[PLACES];
 	int i;
 	
-	NewRawDoFmt("%ld", RAWFMTFUNC_STRING, text, app_data->working_value);
+	NewRawDoFmt("%f", RAWFMTFUNC_STRING, text, app_data->working_value);
 	for (i = 0; i < PLACES; i++)
 	{
 		app_data->display_value[i] = text[i];
@@ -304,9 +324,9 @@ void ApplicationSetDisplayValueFromWorking(struct ApplicationData *app_data)
 
 void ApplicationSetWorkingValueFromDisplay(struct ApplicationData *app_data)
 {
-	int value = string_to_int(app_data->display_value);
+	double value = string_to_double(app_data->display_value);
 	app_data->working_value = value;
-	Printf("Set working value to %ld, from display %s\n", value, app_data->display_value);	
+	Printf("Set working value to %ld, from display %s\n", (long)value, app_data->display_value);	
 }
 
 void ApplicationResetDisplayValue(struct ApplicationData *app_data)
@@ -355,7 +375,9 @@ IPTR ApplicationButtonPressed(Class *cl, Object *obj, struct button_args *msg)
 		}
 		else if (app_data->new_operation == CALC_BUTTON_DOT && !ApplicationDisplayValueContainsDot(app_data))
 		{
-			ApplicationAddToDisplayValue(app_data, '.' - 48);
+			ApplicationAddDotToDisplayValue(app_data);
+			ApplicationAddToDisplayValue(app_data, msg->Button);
+			app_data->new_operation = CALC_BUTTON_NONE;
 		} 
 		else if (app_data->new_operation != CALC_BUTTON_NONE)
 		{
@@ -399,6 +421,7 @@ IPTR ApplicationButtonPressed(Class *cl, Object *obj, struct button_args *msg)
 				ApplicationResetToError(app_data);
 				return 0;
 			}
+			Printf("Working is %ld\n", (long)app_data->working_value);
 			ApplicationSetDisplayValueFromWorking(app_data);
 			app_data->working_value = 0;
 			app_data->initial_operation = TRUE;
@@ -411,7 +434,7 @@ IPTR ApplicationButtonPressed(Class *cl, Object *obj, struct button_args *msg)
 	}
 	// Display changes in UI
 	set(app_data->Text, MUIA_Text_Contents, app_data->display_value);
-	Printf("working %ld, display '%s', active op %ld, new op %ld\n", app_data->working_value, app_data->display_value, app_data->active_operation, app_data->new_operation);
+	Printf("working %ld, display '%s', active op %ld, new op %ld\n", (long)app_data->working_value, app_data->display_value, app_data->active_operation, app_data->new_operation);
 	return 0;
 }
 
