@@ -208,55 +208,31 @@ IPTR ApplicationNew(Class *cl, Object *obj, struct opSet *msg)
 }
 
 
-
-int slow_pow(int base, int pow) 
-{
-	int i = 0;
-	int result = 1;
-	for (; i < pow; i++)
-	{
-		result *= base;
-	}
-	return result;
-}
-
 double string_to_double(char *string)
 {
-	double result = 0;
-	int i = 0;
-	int j = 0;
-	int len = 0;
-	int dot_loc;
-	
-	while(string[len] != '\0')
+	if ((MathBase = OpenLibrary((STRPTR)"mathffp.library", 33)))
 	{
-		len++;
+		CloseLibrary(MathBase);
+		return afp(string);
 	}
-	dot_loc = len;
-	Printf("len of '%s' %ld\n", string, len);
-	for(i = 0; i < len; i++)
+	else
 	{
-		if (string[i] == '.') 
-		{
-			dot_loc = i + 1;
-			continue;
-		}
-		Printf("Adding %ld * %ld\n", slow_pow(10, j), (int)(string[len - i - 1] - 48)); 
-		result += slow_pow(10, j) * (int)(string[len - i - 1] - 48);
-		j++;
+		Printf("Couldn't open mathffp\n");
+		return -1;
 	}
-	result /= slow_pow(10, len - dot_loc);
-
-	return result;
 }
 
 
 BOOL ApplicationApplyOperation(struct ApplicationData *app_data)
 {
+	char buf_working[PLACES];
+	char buf_display[PLACES];
 	double result = 0;
 	double working = app_data->working_value;
 	double display = string_to_double(app_data->display_value);
-	Printf("Working value is %ld, display value is %ld\n", (long)working, (long)display);
+	NewRawDoFmt("%f", RAWFMTFUNC_STRING, buf_working, working);
+	NewRawDoFmt("%f", RAWFMTFUNC_STRING, buf_display, display);
+	Printf("Working value is %s, display value is %s\n", buf_working, buf_display);
 	switch (app_data->active_operation)
 	{
 		case CALC_BUTTON_MUL:
@@ -281,7 +257,8 @@ BOOL ApplicationApplyOperation(struct ApplicationData *app_data)
 		default:
 			break;
 	}
-	Printf("Result is %ld\n", (long)result);
+	NewRawDoFmt("%f", RAWFMTFUNC_STRING, buf_working, result);
+	Printf("Result is %s\n", buf_working);
 	app_data->working_value = result;
 	return TRUE;
 }
@@ -312,7 +289,7 @@ void ApplicationAddDotToDisplayValue(struct ApplicationData *app_data)
 
 void ApplicationSetDisplayValueFromWorking(struct ApplicationData *app_data)
 {
-	char text[PLACES];
+	char text[80];
 	int i;
 	
 	NewRawDoFmt("%f", RAWFMTFUNC_STRING, text, app_data->working_value);
@@ -324,9 +301,11 @@ void ApplicationSetDisplayValueFromWorking(struct ApplicationData *app_data)
 
 void ApplicationSetWorkingValueFromDisplay(struct ApplicationData *app_data)
 {
+	char buff[PLACES];
 	double value = string_to_double(app_data->display_value);
 	app_data->working_value = value;
-	Printf("Set working value to %ld, from display %s\n", (long)value, app_data->display_value);	
+	NewRawDoFmt("%f", RAWFMTFUNC_STRING, buff, value);
+	Printf("Set working value to %s, from display %s\n", buff, app_data->display_value);	
 }
 
 void ApplicationResetDisplayValue(struct ApplicationData *app_data)
