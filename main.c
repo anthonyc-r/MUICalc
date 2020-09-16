@@ -351,6 +351,7 @@ IPTR ApplicationButtonPressed(Class *cl, Object *obj, struct button_args *msg)
 		{
 			ApplicationResetDisplayValue(app_data);
 			ApplicationAddToDisplayValue(app_data, msg->Button);
+			app_data->new_operation = CALC_BUTTON_NONE;
 		}
 		else if (app_data->new_operation == CALC_BUTTON_DOT && !ApplicationDisplayValueContainsDot(app_data))
 		{
