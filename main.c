@@ -14,6 +14,7 @@
 #define CALM_Button_Pressed 0xAEAEAE01
 #define CALM_Show 			0xAEAEAE02
 #define CALM_Hide 			0xAEAEAE03
+#define CALM_Key_Pressed	0xAEAEAE04
 
 #define CONNECT_BUTTON(button, name) DoMethod(button, MUIM_Notify, MUIA_Pressed, FALSE, obj, 2,\
 		CALM_Button_Pressed, (ULONG)name);
@@ -89,11 +90,11 @@ void DeleteApplicationClass(void)
 Object *ApplicationWindow(struct ApplicationData *app_data)
 {
 	return (app_data->Win = MUI_NewObject(MUIC_Window,
-			MUIA_Window_Title, (ULONG)"My window..",
+			MUIA_Window_Title, (ULONG)"MUICalc",
 			MUIA_Window_ID, (ULONG)"winny",
 			MUIA_Window_Activate, TRUE,
 			MUIA_Window_Height, 100,
-			MUIA_Window_Width, 100,
+			MUIA_Window_Width, 200,
 			MUIA_Window_CloseGadget, TRUE,
 			MUIA_Window_RootObject, MUI_NewObject(MUIC_Group,
 				MUIA_Group_Horiz, FALSE,
@@ -187,6 +188,8 @@ IPTR ApplicationNew(Class *cl, Object *obj, struct opSet *msg)
 	app_data->new_operation = CALC_BUTTON_NONE;
 	DoMethod(app_data->Win, MUIM_Notify, MUIA_Window_CloseRequest, TRUE, obj, 2,
 		MUIM_Application_ReturnID, MUIV_Application_ReturnID_Quit);
+	DoMethod(app_data->Win, MUIM_Notify, MUIA_Window_InputEvent, "", obj, 2, 
+		CALM_Key_Pressed);
 	CONNECT_BUTTON(app_data->One, CALC_BUTTON_ONE);
 	CONNECT_BUTTON(app_data->Two, CALC_BUTTON_TWO);
 	CONNECT_BUTTON(app_data->Three, CALC_BUTTON_THREE);
@@ -418,6 +421,12 @@ IPTR ApplicationButtonPressed(Class *cl, Object *obj, struct button_args *msg)
 	return 0;
 }
 
+IPTR ApplicationKeyPressed(Class *cl, Object *obj, void *data)
+{
+	Printf("ApplicationKeyPressed\n");
+	return 0;
+}
+
 IPTR ApplicationDispatcher(void)
 {
 	Class *cl = (Class*)REG_A0;
@@ -437,6 +446,8 @@ IPTR ApplicationDispatcher(void)
 		return set(app_data->Win, MUIA_Window_Open, FALSE);
 	case CALM_Button_Pressed:
 		return ApplicationButtonPressed(cl, obj, (struct button_args*)msg);
+	case CALM_Key_Pressed:
+		return ApplicationKeyPressed(cl, obj, (void *)msg);
 	default:		
 		return DoSuperMethodA(cl, obj, msg);
 	}
