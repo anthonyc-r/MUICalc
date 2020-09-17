@@ -14,10 +14,18 @@
 #define CALM_Button_Pressed 0xAEAEAE01
 #define CALM_Show 			0xAEAEAE02
 #define CALM_Hide 			0xAEAEAE03
-#define CALM_Key_Pressed	0xAEAEAE04
 
-#define CONNECT_BUTTON(button, name) DoMethod(button, MUIM_Notify, MUIA_Pressed, FALSE, obj, 2,\
+#define CONNECT_BUTTON(button, name)\
+	DoMethod(button, MUIM_Notify, MUIA_Pressed, FALSE, obj, 2,\
 		CALM_Button_Pressed, (ULONG)name);
+
+#define CONNECT_KEY(key, name)\
+	DoMethod(app_data->Win, MUIM_Notify, MUIA_Window_InputEvent, key, obj, 2,\
+		CALM_Button_Pressed, (ULONG)name);
+
+#define CONNECT_BUTTON_KEY(button, key, name)\
+	CONNECT_BUTTON(button, name)\
+	CONNECT_KEY(key,  name);
 		
 #pragma pack()
 struct button_args 
@@ -44,7 +52,9 @@ enum calc_button
 	CALC_BUTTON_DIV,
 	CALC_BUTTON_MUL,
 	CALC_BUTTON_ADD,
-	CALC_BUTTON_SUB
+	CALC_BUTTON_SUB,
+	CALC_BUTTON_BSPACE,
+	CALC_BUTTON_RESET
 };
 
 enum calc_error 
@@ -188,24 +198,26 @@ IPTR ApplicationNew(Class *cl, Object *obj, struct opSet *msg)
 	app_data->new_operation = CALC_BUTTON_NONE;
 	DoMethod(app_data->Win, MUIM_Notify, MUIA_Window_CloseRequest, TRUE, obj, 2,
 		MUIM_Application_ReturnID, MUIV_Application_ReturnID_Quit);
-	DoMethod(app_data->Win, MUIM_Notify, MUIA_Window_InputEvent, "", obj, 2, 
-		CALM_Key_Pressed);
-	CONNECT_BUTTON(app_data->One, CALC_BUTTON_ONE);
-	CONNECT_BUTTON(app_data->Two, CALC_BUTTON_TWO);
-	CONNECT_BUTTON(app_data->Three, CALC_BUTTON_THREE);
-	CONNECT_BUTTON(app_data->Four, CALC_BUTTON_FOUR);
-	CONNECT_BUTTON(app_data->Five, CALC_BUTTON_FIVE);
-	CONNECT_BUTTON(app_data->Six, CALC_BUTTON_SIX);
-	CONNECT_BUTTON(app_data->Seven, CALC_BUTTON_SEVEN);
-	CONNECT_BUTTON(app_data->Eight, CALC_BUTTON_EIGHT);
-	CONNECT_BUTTON(app_data->Nine, CALC_BUTTON_NINE);
-	CONNECT_BUTTON(app_data->Add, CALC_BUTTON_ADD);
-	CONNECT_BUTTON(app_data->Subtract, CALC_BUTTON_SUB);
-	CONNECT_BUTTON(app_data->Multiply, CALC_BUTTON_MUL);
-	CONNECT_BUTTON(app_data->Divide, CALC_BUTTON_DIV);
-	CONNECT_BUTTON(app_data->Dot, CALC_BUTTON_DOT);
-	CONNECT_BUTTON(app_data->Equals, CALC_BUTTON_EQ);
-	CONNECT_BUTTON(app_data->Zero, CALC_BUTTON_ZERO);
+	
+	CONNECT_BUTTON_KEY(app_data->One, "1", CALC_BUTTON_ONE);
+	CONNECT_BUTTON_KEY(app_data->Two, "2", CALC_BUTTON_TWO);
+	CONNECT_BUTTON_KEY(app_data->Three, "3", CALC_BUTTON_THREE);
+	CONNECT_BUTTON_KEY(app_data->Four, "4", CALC_BUTTON_FOUR);
+	CONNECT_BUTTON_KEY(app_data->Five, "5", CALC_BUTTON_FIVE);
+	CONNECT_BUTTON_KEY(app_data->Six, "6", CALC_BUTTON_SIX);
+	CONNECT_BUTTON_KEY(app_data->Seven, "7", CALC_BUTTON_SEVEN);
+	CONNECT_BUTTON_KEY(app_data->Eight, "8", CALC_BUTTON_EIGHT);
+	CONNECT_BUTTON_KEY(app_data->Nine, "9", CALC_BUTTON_NINE);
+	CONNECT_BUTTON_KEY(app_data->Add, "+", CALC_BUTTON_ADD);
+	CONNECT_BUTTON_KEY(app_data->Subtract, "-", CALC_BUTTON_SUB);
+	// * doesn't work!
+	CONNECT_BUTTON_KEY(app_data->Multiply, "x", CALC_BUTTON_MUL);
+	CONNECT_BUTTON_KEY(app_data->Divide, "/", CALC_BUTTON_DIV);
+	CONNECT_BUTTON_KEY(app_data->Dot, ".", CALC_BUTTON_DOT);
+	CONNECT_BUTTON_KEY(app_data->Equals, "return", CALC_BUTTON_EQ);
+	CONNECT_BUTTON_KEY(app_data->Zero, "0", CALC_BUTTON_ZERO);
+	CONNECT_KEY("backspace", CALC_BUTTON_BSPACE);
+	CONNECT_KEY("r", CALC_BUTTON_RESET);
 	
 	return (IPTR)obj;
 }
@@ -343,6 +355,25 @@ void ApplicationResetToError(struct ApplicationData *app_data)
 	set(app_data->Text, MUIA_Text_Contents, app_data->display_value);	
 }
 
+void ApplicationDeleteDisplayCharacter(struct ApplicationData *app_data)
+{
+	app_data->active_place--;
+	if (app_data->active_place < 0)
+	{
+		app_data->active_place = 0;
+	}
+	app_data->display_value[app_data->active_place] = '\0';
+}
+
+void ApplicationReset(struct ApplicationData *app_data)
+{
+	ApplicationResetDisplayValue(app_data);
+	app_data->new_operation = CALC_BUTTON_NONE;
+	app_data->working_value = 0;
+	app_data->active_operation = CALC_BUTTON_NONE;
+	app_data->new_operation = CALC_BUTTON_NONE;
+}
+
 IPTR ApplicationButtonPressed(Class *cl, Object *obj, struct button_args *msg)
 {
 	Printf("Button Pressed %ld!\n", msg->Button);
@@ -411,6 +442,12 @@ IPTR ApplicationButtonPressed(Class *cl, Object *obj, struct button_args *msg)
 			app_data->active_operation = CALC_BUTTON_NONE;
 			app_data->new_operation = CALC_BUTTON_EQ;
 			break;
+		case CALC_BUTTON_BSPACE:
+			ApplicationDeleteDisplayCharacter(app_data);	
+			break;
+		case CALC_BUTTON_RESET:
+			ApplicationReset(app_data);
+			break;
 		default:
 			break;
 		}
@@ -418,12 +455,6 @@ IPTR ApplicationButtonPressed(Class *cl, Object *obj, struct button_args *msg)
 	// Display changes in UI
 	set(app_data->Text, MUIA_Text_Contents, app_data->display_value);
 	Printf("working %ld, display '%s', active op %ld, new op %ld\n", (long)app_data->working_value, app_data->display_value, app_data->active_operation, app_data->new_operation);
-	return 0;
-}
-
-IPTR ApplicationKeyPressed(Class *cl, Object *obj, void *data)
-{
-	Printf("ApplicationKeyPressed\n");
 	return 0;
 }
 
@@ -446,8 +477,6 @@ IPTR ApplicationDispatcher(void)
 		return set(app_data->Win, MUIA_Window_Open, FALSE);
 	case CALM_Button_Pressed:
 		return ApplicationButtonPressed(cl, obj, (struct button_args*)msg);
-	case CALM_Key_Pressed:
-		return ApplicationKeyPressed(cl, obj, (void *)msg);
 	default:		
 		return DoSuperMethodA(cl, obj, msg);
 	}
